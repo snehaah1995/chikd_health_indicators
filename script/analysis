@@ -1,0 +1,161 @@
+
+/*------------------------------------------------------------------------------
+  5. ANALYSIS A - BIRTHS & NEWBORN HEALTH
+------------------------------------------------------------------------------*/
+
+-- A1. Overall totals
+SELECT
+    SUM(total_live_births)  AS total_live_births,
+    SUM(total_still_births) AS total_still_births,
+    CAST(SUM(total_still_births) * 1000.0
+         / NULLIF(SUM(total_live_births + total_still_births), 0) AS DECIMAL(6,2)) AS overall_stillbirth_rate_per_1000
+FROM dbo.BirthData;
+
+-- A2. Top 5 and bottom 5 districts by live births
+SELECT TOP 5 'Highest' AS category, district_name, total_live_births
+FROM dbo.BirthData ORDER BY total_live_births DESC;
+
+SELECT TOP 5 'Lowest' AS category, district_name, total_live_births
+FROM dbo.BirthData ORDER BY total_live_births ASC;
+
+-- A3. Top 5 districts by stillbirth rate
+SELECT TOP 5 district_name, total_still_births, stillbirth_rate_per_1000
+FROM dbo.vw_BirthIndicators
+ORDER BY stillbirth_rate_per_1000 DESC;
+
+-- A4. Highest and lowest low-birth-weight RATE (not raw counts)
+SELECT TOP 5 'Highest LBW rate' AS category, district_name, low_birth_weight_pct
+FROM dbo.vw_BirthIndicators ORDER BY low_birth_weight_pct DESC;
+
+SELECT TOP 5 'Lowest LBW rate' AS category, district_name, low_birth_weight_pct
+FROM dbo.vw_BirthIndicators ORDER BY low_birth_weight_pct ASC;
+
+-- A5. Newborns weighed at birth (lowest = weakest record-keeping/care)
+SELECT TOP 5 district_name, pct_weighed_at_birth
+FROM dbo.vw_BirthIndicators
+ORDER BY pct_weighed_at_birth ASC;
+
+-- A6. Early breastfeeding: best 5 districts
+SELECT TOP 5 district_name, pct_breastfed_within_1hr
+FROM dbo.vw_BirthIndicators
+ORDER BY pct_breastfed_within_1hr DESC;
+
+
+/*------------------------------------------------------------------------------
+  6. ANALYSIS B - IMMUNIZATION COVERAGE
+------------------------------------------------------------------------------*/
+
+-- B1. Full coverage table by district
+SELECT * FROM dbo.vw_ImmunizationCoverage ORDER BY district_name;
+
+-- B2. State-level coverage for every vaccine
+SELECT
+    CAST(SUM(i.infants_given_OPV_zero)     * 100.0 / SUM(b.total_live_births) AS DECIMAL(5,2)) AS opv0_pct,
+    CAST(SUM(i.infants_given_BCG)          * 100.0 / SUM(b.total_live_births) AS DECIMAL(5,2)) AS bcg_pct,
+    CAST(SUM(i.infants_given_DPT3)         * 100.0 / SUM(b.total_live_births) AS DECIMAL(5,2)) AS dpt3_pct,
+    CAST(SUM(i.infants_given_measles)      * 100.0 / SUM(b.total_live_births) AS DECIMAL(5,2)) AS measles_pct,
+    CAST(SUM(i.fully_immunized_9_11_months)* 100.0 / SUM(b.total_live_births) AS DECIMAL(5,2)) AS fully_immunized_pct
+FROM dbo.ImmunizationData i
+JOIN dbo.BirthData        b ON b.district_name = i.district_name;
+
+-- B3. Best and worst 5 districts for fully immunized children (9-11 months)
+SELECT TOP 5 'Best' AS category, district_name, fully_immunized_pct
+FROM dbo.vw_ImmunizationCoverage ORDER BY fully_immunized_pct DESC;
+
+SELECT TOP 5 'Worst' AS category, district_name, fully_immunized_pct
+FROM dbo.vw_ImmunizationCoverage ORDER BY fully_immunized_pct ASC;
+
+-- B4. Districts where key vaccines (OPV0, BCG, DPT3) fall below the state average
+WITH state_avg AS (
+    SELECT AVG(opv0_pct) AS opv0, AVG(bcg_pct) AS bcg, AVG(dpt3_pct) AS dpt3
+    FROM dbo.vw_ImmunizationCoverage
+)
+SELECT v.district_name, v.opv0_pct, v.bcg_pct, v.dpt3_pct
+FROM dbo.vw_ImmunizationCoverage v
+CROSS JOIN state_avg s
+WHERE v.opv0_pct < s.opv0 AND v.bcg_pct < s.bcg AND v.dpt3_pct < s.dpt3
+ORDER BY v.dpt3_pct;
+
+-- B5. Largest coverage gap per district (which vaccine is weakest?)
+SELECT
+    v.district_name,
+    g.vaccine         AS weakest_vaccine,
+    g.coverage_pct,
+    CAST(100 - g.coverage_pct AS DECIMAL(6,2)) AS gap_pct
+FROM dbo.vw_ImmunizationCoverage v
+CROSS APPLY (
+    SELECT TOP 1 vaccine, coverage_pct
+    FROM (VALUES ('OPV0',    v.opv0_pct),
+                 ('BCG',     v.bcg_pct),
+                 ('Hep B0',  v.hepb0_pct),
+                 ('DPT3',    v.dpt3_pct),
+                 ('Penta3',  v.penta3_pct),
+                 ('Measles', v.measles_pct)) AS x(vaccine, coverage_pct)
+    ORDER BY coverage_pct ASC
+) g
+ORDER BY gap_pct DESC;
+
+-- B6. Drop-off between first and third dose (DPT1 -> DPT3)
+SELECT
+    district_name,
+    infants_given_DPT1,
+    infants_given_DPT3,
+    CAST((infants_given_DPT1 - infants_given_DPT3) * 100.0
+         / NULLIF(infants_given_DPT1, 0) AS DECIMAL(5,2)) AS dropout_pct
+FROM dbo.ImmunizationData
+ORDER BY dropout_pct DESC;
+
+-- B7. Districts reporting zero DPT doses (likely missing data)
+SELECT district_name
+FROM dbo.ImmunizationData
+WHERE ISNULL(infants_given_DPT1,0) + ISNULL(infants_given_DPT2,0) + ISNULL(infants_given_DPT3,0) = 0;
+
+
+/*------------------------------------------------------------------------------
+  7. ANALYSIS C - CHILD ILLNESS & VACCINE IMPACT
+------------------------------------------------------------------------------*/
+
+-- C1. Disease burden per 1,000 live births
+SELECT district_name, pneumonia_per_1000_births, diarrhoea_per_1000_births, measles_per_1000_births
+FROM dbo.vw_ChildHealthIndicators
+ORDER BY diarrhoea_per_1000_births DESC;
+
+-- C2. Diarrhoea cases admitted as inpatients
+SELECT district_name, diarrhoea_inpatient_pct
+FROM dbo.vw_ChildHealthIndicators
+ORDER BY diarrhoea_inpatient_pct DESC;
+
+-- C3. Rotavirus vaccine vs diarrhoea: low coverage AND high burden = priority districts
+WITH ranked AS (
+    SELECT *,
+        NTILE(4) OVER (ORDER BY rotavirus_dose1_pct ASC)      AS coverage_quartile,
+        NTILE(4) OVER (ORDER BY diarrhoea_per_1000_births DESC) AS burden_quartile
+    FROM dbo.vw_ChildHealthIndicators
+)
+SELECT district_name, rotavirus_dose1_pct, diarrhoea_per_1000_births
+FROM ranked
+WHERE coverage_quartile = 1 AND burden_quartile = 1      -- bottom 25% coverage, top 25% burden
+ORDER BY diarrhoea_per_1000_births DESC;
+
+-- C4. Measles cases vs measles-rubella vaccine coverage
+SELECT
+    district_name,
+    measles_per_1000_births,
+    mr_dose1_pct,
+    mr_dose2_pct
+FROM dbo.vw_ChildHealthIndicators
+ORDER BY measles_per_1000_births DESC;
+
+-- C5. Priority scorecard: one row per district combining all three areas
+SELECT
+    b.district_name,
+    b.low_birth_weight_pct,
+    i.fully_immunized_pct,
+    c.diarrhoea_per_1000_births,
+    c.rotavirus_dose1_pct,
+    RANK() OVER (ORDER BY i.fully_immunized_pct ASC)        AS immunization_rank_worst_first,
+    RANK() OVER (ORDER BY b.low_birth_weight_pct DESC)      AS lbw_rank_worst_first
+FROM dbo.vw_BirthIndicators        b
+JOIN dbo.vw_ImmunizationCoverage   i ON i.district_name = b.district_name
+JOIN dbo.vw_ChildHealthIndicators  c ON c.district_name = b.district_name
+ORDER BY immunization_rank_worst_first;
