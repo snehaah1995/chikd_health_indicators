@@ -1,0 +1,63 @@
+
+/*------------------------------------------------------------------------------
+  1. DATABASE & TABLE SETUP
+------------------------------------------------------------------------------*/
+IF DB_ID('HealthData2017_18') IS NULL
+    CREATE DATABASE HealthData2017_18;
+GO
+
+USE HealthData2017_18;
+GO
+
+DROP TABLE IF EXISTS dbo.ChildHealthData, dbo.ImmunizationData, dbo.BirthData;
+GO
+
+CREATE TABLE dbo.BirthData (
+    sl_no                           INT,
+    district_name                   NVARCHAR(255) NOT NULL,
+    total_live_births               INT,
+    total_still_births              INT,
+    newborns_weighed_at_birth       INT,
+    newborns_below_2_5kg            INT,
+    newborns_breastfed_within_1hr   INT,
+    sex_ratio_at_birth              DECIMAL(8,2)
+);
+
+CREATE TABLE dbo.ImmunizationData (
+    sl_no                           INT,
+    district_name                   NVARCHAR(255) NOT NULL,
+    infants_given_OPV_zero          INT,
+    infants_given_BCG               INT,
+    infants_given_Hep_B0            INT,
+    infants_given_DPT1              INT,
+    infants_given_DPT2              INT,
+    infants_given_DPT3              INT,
+    infants_given_Pentavalent1      INT,
+    infants_given_Pentavalent2      INT,
+    infants_given_Pentavalent3      INT,
+    infants_given_measles           INT,
+    infants_given_MR                INT,
+    fully_immunized_9_11_months     INT
+);
+
+CREATE TABLE dbo.ChildHealthData (
+    sl_no                                   INT,
+    district_name                           NVARCHAR(255) NOT NULL,
+    pneumonia_0_5_yrs                       INT,
+    asthma_0_5_yrs                          INT,
+    sepsis_0_5_yrs                          INT,
+    diphtheria_0_5_yrs                      INT,
+    tb_0_5_yrs                              INT,
+    measles_0_5_yrs                         INT,
+    malaria_0_5_yrs                         INT,
+    diarrhoea_0_5_yrs                       INT,
+    diarrhoea_inpatient_0_5_yrs             INT,
+    infants_MR_vaccine_dose1                INT,
+    infants_rotavirus_dose1                 INT,
+    infants_rotavirus_dose2                 INT,
+    infants_rotavirus_dose3                 INT,
+    children_16_24m_measles_dose2           INT,
+    children_16_24m_MR_dose2                INT
+);
+GO
+
