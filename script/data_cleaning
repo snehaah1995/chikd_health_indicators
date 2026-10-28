@@ -1,0 +1,45 @@
+
+/*------------------------------------------------------------------------------
+  3. DATA QUALITY CHECKS & CLEANING
+------------------------------------------------------------------------------*/
+
+-- 3.1 Remove stray spaces in district names (needed for reliable joins)
+UPDATE dbo.BirthData        SET district_name = LTRIM(RTRIM(district_name));
+UPDATE dbo.ImmunizationData SET district_name = LTRIM(RTRIM(district_name));
+UPDATE dbo.ChildHealthData  SET district_name = LTRIM(RTRIM(district_name));
+
+-- 3.2 NULL profile for BirthData
+SELECT
+    COUNT(*)                                                          AS total_rows,
+    COUNT(DISTINCT district_name)                                     AS distinct_districts,
+    SUM(CASE WHEN total_live_births            IS NULL THEN 1 ELSE 0 END) AS null_live_births,
+    SUM(CASE WHEN total_still_births           IS NULL THEN 1 ELSE 0 END) AS null_still_births,
+    SUM(CASE WHEN newborns_weighed_at_birth    IS NULL THEN 1 ELSE 0 END) AS null_weighed,
+    SUM(CASE WHEN newborns_below_2_5kg         IS NULL THEN 1 ELSE 0 END) AS null_below_2_5kg,
+    SUM(CASE WHEN newborns_breastfed_within_1hr IS NULL THEN 1 ELSE 0 END) AS null_breastfed,
+    SUM(CASE WHEN sex_ratio_at_birth           IS NULL THEN 1 ELSE 0 END) AS null_sex_ratio
+FROM dbo.BirthData;
+
+-- 3.3 Duplicate districts (expect zero rows)
+SELECT district_name, COUNT(*) AS occurrences
+FROM dbo.BirthData
+GROUP BY district_name
+HAVING COUNT(*) > 1;
+
+-- 3.4 Districts that do not match across tables (expect zero rows)
+SELECT b.district_name AS in_birth_not_in_immunization
+FROM dbo.BirthData b
+LEFT JOIN dbo.ImmunizationData i ON i.district_name = b.district_name
+WHERE i.district_name IS NULL;
+
+SELECT b.district_name AS in_birth_not_in_child_health
+FROM dbo.BirthData b
+LEFT JOIN dbo.ChildHealthData c ON c.district_name = b.district_name
+WHERE c.district_name IS NULL;
+
+-- 3.5 Logical sanity checks (expect zero rows)
+SELECT district_name, total_live_births, newborns_weighed_at_birth, newborns_below_2_5kg
+FROM dbo.BirthData
+WHERE newborns_weighed_at_birth > total_live_births
+   OR newborns_below_2_5kg      > newborns_weighed_at_birth;
+GO
