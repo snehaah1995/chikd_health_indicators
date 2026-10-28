@@ -1,0 +1,56 @@
+
+/*------------------------------------------------------------------------------
+  4. REPORTING VIEWS
+------------------------------------------------------------------------------*/
+
+-- 4.1 Birth indicators per district
+CREATE OR ALTER VIEW dbo.vw_BirthIndicators AS
+SELECT
+    district_name,
+    total_live_births,
+    total_still_births,
+    CAST(total_still_births * 1000.0
+         / NULLIF(total_live_births + total_still_births, 0) AS DECIMAL(6,2)) AS stillbirth_rate_per_1000,
+    CAST(newborns_weighed_at_birth * 100.0
+         / NULLIF(total_live_births, 0) AS DECIMAL(5,2))                       AS pct_weighed_at_birth,
+    CAST(newborns_below_2_5kg * 100.0
+         / NULLIF(newborns_weighed_at_birth, 0) AS DECIMAL(5,2))               AS low_birth_weight_pct,
+    CAST(newborns_breastfed_within_1hr * 100.0
+         / NULLIF(total_live_births, 0) AS DECIMAL(5,2))                       AS pct_breastfed_within_1hr,
+    sex_ratio_at_birth
+FROM dbo.BirthData;
+GO
+
+-- 4.2 Immunization coverage per district (denominator = live births)
+CREATE OR ALTER VIEW dbo.vw_ImmunizationCoverage AS
+SELECT
+    i.district_name,
+    b.total_live_births,
+    CAST(i.infants_given_OPV_zero      * 100.0 / NULLIF(b.total_live_births,0) AS DECIMAL(6,2)) AS opv0_pct,
+    CAST(i.infants_given_BCG           * 100.0 / NULLIF(b.total_live_births,0) AS DECIMAL(6,2)) AS bcg_pct,
+    CAST(i.infants_given_Hep_B0        * 100.0 / NULLIF(b.total_live_births,0) AS DECIMAL(6,2)) AS hepb0_pct,
+    CAST(i.infants_given_DPT3          * 100.0 / NULLIF(b.total_live_births,0) AS DECIMAL(6,2)) AS dpt3_pct,
+    CAST(i.infants_given_Pentavalent3  * 100.0 / NULLIF(b.total_live_births,0) AS DECIMAL(6,2)) AS penta3_pct,
+    CAST(i.infants_given_measles       * 100.0 / NULLIF(b.total_live_births,0) AS DECIMAL(6,2)) AS measles_pct,
+    CAST(i.infants_given_MR            * 100.0 / NULLIF(b.total_live_births,0) AS DECIMAL(6,2)) AS mr_pct,
+    CAST(i.fully_immunized_9_11_months * 100.0 / NULLIF(b.total_live_births,0) AS DECIMAL(6,2)) AS fully_immunized_pct
+FROM dbo.ImmunizationData i
+JOIN dbo.BirthData        b ON b.district_name = i.district_name;
+GO
+
+-- 4.3 Child illness burden and vaccine coverage per district
+CREATE OR ALTER VIEW dbo.vw_ChildHealthIndicators AS
+SELECT
+    c.district_name,
+    b.total_live_births,
+    CAST(c.pneumonia_0_5_yrs * 1000.0 / NULLIF(b.total_live_births,0) AS DECIMAL(8,2)) AS pneumonia_per_1000_births,
+    CAST(c.diarrhoea_0_5_yrs * 1000.0 / NULLIF(b.total_live_births,0) AS DECIMAL(8,2)) AS diarrhoea_per_1000_births,
+    CAST(c.measles_0_5_yrs   * 1000.0 / NULLIF(b.total_live_births,0) AS DECIMAL(8,2)) AS measles_per_1000_births,
+    CAST(c.diarrhoea_inpatient_0_5_yrs * 100.0 / NULLIF(c.diarrhoea_0_5_yrs,0) AS DECIMAL(6,2)) AS diarrhoea_inpatient_pct,
+    CAST(c.infants_rotavirus_dose1 * 100.0 / NULLIF(b.total_live_births,0) AS DECIMAL(6,2)) AS rotavirus_dose1_pct,
+    CAST(c.infants_rotavirus_dose3 * 100.0 / NULLIF(b.total_live_births,0) AS DECIMAL(6,2)) AS rotavirus_dose3_pct,
+    CAST(c.infants_MR_vaccine_dose1 * 100.0 / NULLIF(b.total_live_births,0) AS DECIMAL(6,2)) AS mr_dose1_pct,
+    CAST(c.children_16_24m_MR_dose2 * 100.0 / NULLIF(b.total_live_births,0) AS DECIMAL(6,2)) AS mr_dose2_pct
+FROM dbo.ChildHealthData c
+JOIN dbo.BirthData       b ON b.district_name = c.district_name;
+GO
