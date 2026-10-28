@@ -1,0 +1,26 @@
+
+/*------------------------------------------------------------------------------
+  2. DATA LOADING
+  Change the folder path to where the CSVs are saved on your machine.
+  FORMAT = 'CSV' needs SQL Server 2017+. KEEPNULLS keeps blanks as NULL.
+------------------------------------------------------------------------------*/
+BULK INSERT dbo.BirthData
+FROM 'C:\Users\sneha\Desktop\project1\health_data\BirthandImmunizationData.CSV'
+WITH (FORMAT = 'CSV', FIRSTROW = 2, KEEPNULLS);
+
+BULK INSERT dbo.ImmunizationData
+FROM 'C:\Users\sneha\Desktop\project1\health_data\ImmunizationData.CSV'
+WITH (FORMAT = 'CSV', FIRSTROW = 2, KEEPNULLS);
+
+BULK INSERT dbo.ChildHealthData
+FROM 'C:\Users\sneha\Desktop\project1\health_data\ChildHealthData.CSV'
+WITH (FORMAT = 'CSV', FIRSTROW = 2, KEEPNULLS);
+GO
+
+-- Verify row counts (all three should match the number of districts)
+SELECT 'BirthData'        AS table_name, COUNT(*) AS total_rows FROM dbo.BirthData
+UNION ALL
+SELECT 'ImmunizationData',               COUNT(*)              FROM dbo.ImmunizationData
+UNION ALL
+SELECT 'ChildHealthData',                COUNT(*)              FROM dbo.ChildHealthData;
+GO
